@@ -9,7 +9,7 @@ import (
 
 type Storage struct{}
 
-func (s *Storage) UploadFile(uid, fname string, b []byte) error {
+func (s *Storage) UploadFile(uid, fname, fid string, b []byte) error {
 	db := misc.Backend.Db.Copy()
 	fs := db.DB("static").GridFS("fs")
 
@@ -25,7 +25,7 @@ func (s *Storage) UploadFile(uid, fname string, b []byte) error {
 		return err
 	}
 
-	meta := bson.M{"uid": uid}
+	meta := bson.M{"uid": uid, "fid": fid}
 	file.SetMeta(meta)
 
 	file.Close()
@@ -70,4 +70,55 @@ func (s *Storage) DeleteFile(uid, fname string) error {
 	db.Close()
 
 	return nil
+}
+
+func (s *Storage) InitUploadUrl(uid, fid string) (interface{}, error) {
+	db := misc.Backend.Db.Copy()
+	fs := db.DB("static").GridFS("fs")
+
+	cond := bson.M{"uid": uid, "fid": fid}
+	file, err := fs.Find(cond)
+	if err != nil {
+		log.Warn("failed to get file sign:[%s:%s], Err:[%s]", uid, fid, err)
+		return err
+	}
+
+	var res interface{} = nil
+	err = file.GetMeta(&res)
+	if err != nil {
+		log.Warn("failed to get meta:[%s:%s], Err:[%s]", uid, fid, err)
+		return nil, err
+	}
+
+	file.Close()
+	db.Close()
+
+	return res, nil
+
+	return nil
+}
+
+func (s *Storage) GetMeta(uid, fid string) (interface{}, error) {
+	db := misc.Backend.Db.Copy()
+	fs := db.DB("static").GridFS("fs")
+
+	fids := strings.Split(fid, ",")
+	cond := bson.M{"uid": uid, "fid": bson.M{"$in": fids}}
+	file, err := fs.Find(cond)
+	if err != nil {
+		log.Warn("failed to get file:[%s:%s], Err:[%s]", uid, fid, err)
+		return nil, err
+	}
+
+	var res interface{} = nil
+	err = file.GetMeta(&res)
+	if err != nil {
+		log.Warn("failed to get meta:[%s:%s], Err:[%s]", uid, fid, err)
+		return nil, err
+	}
+
+	file.Close()
+	db.Close()
+
+	return res, nil
 }

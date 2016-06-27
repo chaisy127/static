@@ -59,8 +59,9 @@ func staticHandler(w http.ResponseWriter, r *http.Request) {
 	case "POST":
 		uid := r.URL.Query().Get("uid")
 		fname := r.URL.Query().Get("fname")
+		fid := r.URL.Query().Get("fid")
 
-		if uid == "" || fname == "" {
+		if uid == "" || fname == "" || fid == "" {
 			http.Error(w, "Bad Request", 400)
 			return
 		}
@@ -71,7 +72,7 @@ func staticHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		err = s.UploadFile(uid, fname, b)
+		err = s.UploadFile(uid, fname, fid, b)
 		if err != nil {
 			resp.ErrNo = 10002
 			resp.ErrMsg = "failed to upload"
@@ -97,6 +98,54 @@ func staticHandler(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, "%s", string(b))
 			return
 		}
+		data = "done"
+	case "HEAD":
+		uid := r.URL.Query().Get("uid")
+		fid := r.URL.Query().Get("fid")
+		if uid == "" || fid == "" {
+			http.Error(w, "Bad Request", 400)
+			return
+		}
+
+		d, err := s.GetMeta(uid, fid)
+		data = d
+	default:
+		http.Error(w, "Method not allowed", 405)
+		return
+	}
+
+	resp.Data = data
+	b, _ := json.Marshal(resp)
+	fmt.Fprintf(w, "%s", string(b))
+}
+
+func initHandler(w http.ResponseWriter, r *http.Request) {
+	resp := &Response{
+		ErrNo:  10000,
+		ErrMsg: "",
+	}
+
+	s := &handler.Storage{}
+	var data interface{} = nil
+	switch r.Method {
+	case "POST":
+		uid := r.URL.Query().Get("uid")
+		fsign := r.URL.Query().Get("fsign")
+
+		if uid == "" || fsign == "" {
+			http.Error(w, "Bad Request", 400)
+			return
+		}
+
+		err = s.InitUploadUrl(uid, fsign)
+		if err != nil {
+			resp.ErrNo = 10004
+			resp.ErrMsg = "failed to upload"
+			b, _ := json.Marshal(resp)
+			fmt.Fprintf(w, "%s", string(b))
+			return
+		}
+
 		data = "done"
 	default:
 		http.Error(w, "Method not allowed", 405)
@@ -124,6 +173,7 @@ func main() {
 	misc.InitBackend()
 
 	http.HandleFunc("/api/v1/static", staticHandler)
+	http.HandleFunc("/api/v1/init", initHandler)
 
 	err := http.ListenAndServe(misc.Conf.Addr, nil)
 	if err != nil {
