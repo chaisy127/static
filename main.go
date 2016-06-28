@@ -161,7 +161,24 @@ func bucketHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	bucket := &handler.Bucket{}
+	var data interface{} = nil
 	switch r.Method {
+	case "GET":
+		bucketName := r.URL.Query().Get("bucketname")
+		if bucketName == "" {
+			http.Error(w, "Bad Request", 400)
+			return
+		}
+
+		d, err := bucket.ListBucket(bucketName)
+		if err != nil {
+			resp.ErrNo = 10005
+			resp.ErrMsg = "failed to create bucket"
+			b, _ := json.Marshal(resp)
+			fmt.Fprintf(w, "%s", string(b))
+			return
+		}
+		data = d
 	case "POST":
 		bucketName := r.URL.Query().Get("bucketname")
 		if bucketName == "" {
@@ -171,12 +188,13 @@ func bucketHandler(w http.ResponseWriter, r *http.Request) {
 
 		err := bucket.CreateBucket(bucketName)
 		if err != nil {
-			resp.ErrNo = 10005
+			resp.ErrNo = 10006
 			resp.ErrMsg = "failed to create bucket"
 			b, _ := json.Marshal(resp)
 			fmt.Fprintf(w, "%s", string(b))
 			return
 		}
+		data = "done"
 	case "DELETE":
 		bucketName := r.URL.Query().Get("bucketname")
 		if bucketName == "" {
@@ -186,17 +204,19 @@ func bucketHandler(w http.ResponseWriter, r *http.Request) {
 
 		err := bucket.DeleteBucket(bucketName)
 		if err != nil {
-			resp.ErrNo = 10006
+			resp.ErrNo = 10007
 			resp.ErrMsg = "failed to delete bucket"
 			b, _ := json.Marshal(resp)
 			fmt.Fprintf(w, "%s", string(b))
 			return
 		}
+		data = "done"
 	default:
 		http.Error(w, "Method not allowed", 405)
 		return
 	}
 
+	resp.Data = data
 	b, _ := json.Marshal(resp)
 	fmt.Fprintf(w, "%s", string(b))
 }
