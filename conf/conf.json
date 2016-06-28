@@ -1,28 +1,10 @@
 {
     "addr": "0.0.0.0:8080",
-    "sso_url": "http://sso.scloud.letv.com/api/checkTicket/tk",
-    "diff_url": "http://diff.scloud.letv.com/api/v1/changelog",
-    "lecloud": {
-        "url": "http://cloud.letv.com/tpdisk",
-        "appkey": "102",
-        "platformid": "200102"
-    },
-    "cache": {
-        "default_expire": 6,
-        "gc_interval": 4
-    },
     "mongo": {
-        "hosts": "10.110.50.32:9278,10.110.50.33:9278,10.110.50.34:9278",
+        "hosts": "127.0.0.1:27017",
         "timeout": 30,
         "db": "admin",
-        "user": "admin",
-        "passwd": "YTAxMzI2MmViOGN"
-    },
-    "omp_mongo": {
-        "hosts": "10.183.95.57:9310,10.183.95.58:9310,10.183.95.59:9310",
-        "timeout": 30,
-        "db": "admin",
-        "user": "admin",
-        "passwd": "NjFlYzVhYTUxZDA"
+        "user": "",
+        "passwd": ""
     }
 }

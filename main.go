@@ -39,14 +39,14 @@ func staticHandler(w http.ResponseWriter, r *http.Request) {
 	var data interface{} = nil
 	switch r.Method {
 	case "GET":
-		uid := r.URL.Query().Get("uid")
-		fname := r.URL.Query().Get("fname")
-		if uid == "" || fname == "" {
+		fid := r.URL.Query().Get("fid")
+		bucketName := r.URL.Query().Get("bucketname")
+		if fid == "" || bucketName == "" {
 			http.Error(w, "Bad Request", 400)
 			return
 		}
 
-		d, err := s.DownloadFile(uid, fname)
+		d, err := s.DownloadFile(fid, bucketName)
 		if err != nil {
 			resp.ErrNo = 10001
 			resp.ErrMsg = "failed to download"
@@ -57,11 +57,11 @@ func staticHandler(w http.ResponseWriter, r *http.Request) {
 
 		data = d
 	case "POST":
-		uid := r.URL.Query().Get("uid")
 		fname := r.URL.Query().Get("fname")
 		fid := r.URL.Query().Get("fid")
+		bucketName := r.URL.Query().Get("bucketname")
 
-		if uid == "" || fname == "" || fid == "" {
+		if fname == "" || fid == "" || bucketName == "" {
 			http.Error(w, "Bad Request", 400)
 			return
 		}
@@ -72,7 +72,7 @@ func staticHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		err = s.UploadFile(uid, fname, fid, b)
+		err = s.UploadFile(fname, fid, bucketName, b)
 		if err != nil {
 			resp.ErrNo = 10002
 			resp.ErrMsg = "failed to upload"
@@ -81,16 +81,16 @@ func staticHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		data = "done"
+		data = fid
 	case "DELETE":
-		uid := r.URL.Query().Get("uid")
-		fname := r.URL.Query().Get("fname")
-		if uid == "" || fname == "" {
+		fid := r.URL.Query().Get("fid")
+		bucketName := r.URL.Query().Get("bucketname")
+		if fid == "" || bucketName == "" {
 			http.Error(w, "Bad Request", 400)
 			return
 		}
 
-		err := s.DeleteFile(uid, fname)
+		err := s.DeleteFile(fid, bucketName)
 		if err != nil {
 			resp.ErrNo = 10003
 			resp.ErrMsg = "failed to delete"
@@ -100,14 +100,14 @@ func staticHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		data = "done"
 	case "HEAD":
-		uid := r.URL.Query().Get("uid")
 		fid := r.URL.Query().Get("fid")
-		if uid == "" || fid == "" {
+		bucketName := r.URL.Query().Get("bucketname")
+		if fid == "" || bucketName == "" {
 			http.Error(w, "Bad Request", 400)
 			return
 		}
 
-		d, err := s.GetMeta(uid, fid)
+		d, err := s.GetMeta(fid, bucketName)
 		if err != nil {
 			resp.ErrNo = 10004
 			resp.ErrMsg = "failed to head"
@@ -136,20 +136,67 @@ func initHandler(w http.ResponseWriter, r *http.Request) {
 	var data interface{} = nil
 	switch r.Method {
 	case "POST":
-		fsign := r.URL.Query().Get("fsign")
+		fid := r.URL.Query().Get("fid")
 
-		if fsign == "" {
+		if fid == "" {
 			http.Error(w, "Bad Request", 400)
 			return
 		}
 
-		data = s.InitUploadUrl(fsign)
+		data = s.InitUploadUrl(fid)
 	default:
 		http.Error(w, "Method not allowed", 405)
 		return
 	}
 
 	resp.Data = data
+	b, _ := json.Marshal(resp)
+	fmt.Fprintf(w, "%s", string(b))
+}
+
+func bucketHandler(w http.ResponseWriter, r *http.Request) {
+	resp := &Response{
+		ErrNo:  10000,
+		ErrMsg: "",
+	}
+
+	bucket := &handler.Bucket{}
+	switch r.Method {
+	case "POST":
+		bucketName := r.URL.Query().Get("bucketname")
+		if bucketName == "" {
+			http.Error(w, "Bad Request", 400)
+			return
+		}
+
+		err := bucket.CreateBucket(bucketName)
+		if err != nil {
+			resp.ErrNo = 10005
+			resp.ErrMsg = "failed to create bucket"
+			b, _ := json.Marshal(resp)
+			fmt.Fprintf(w, "%s", string(b))
+			return
+		}
+	case "DELETE":
+		bucketName := r.URL.Query().Get("bucketname")
+		if bucketName == "" {
+			http.Error(w, "Bad Request", 400)
+			return
+		}
+
+		err := bucket.DeleteBucket(bucketName)
+		if err != nil {
+			resp.ErrNo = 10006
+			resp.ErrMsg = "failed to delete bucket"
+			b, _ := json.Marshal(resp)
+			fmt.Fprintf(w, "%s", string(b))
+			return
+		}
+	default:
+		http.Error(w, "Method not allowed", 405)
+		return
+	}
+
 	b, _ := json.Marshal(resp)
 	fmt.Fprintf(w, "%s", string(b))
 }
@@ -163,18 +210,21 @@ func main() {
 	log.LoadConfiguration(*logConfigFile)
 
 	if err := misc.LoadConf(*configFile); err != nil {
-		fmt.Printf("failed to ListenAndServe: (%s)", err)
+		fmt.Printf("failed to load configure, Err:[%s]", err)
 		os.Exit(1)
 	}
 
-	misc.InitBackend()
+	if err := misc.InitBackend(); err != nil {
+		fmt.Printf("failed to init database, Err:[%s]", err)
+	}
 
 	http.HandleFunc("/api/v1/static", staticHandler)
 	http.HandleFunc("/api/v1/init", initHandler)
+	http.HandleFunc("/api/v1/bucket", bucketHandler)
 
 	err := http.ListenAndServe(misc.Conf.Addr, nil)
 	if err != nil {
-		fmt.Printf("failed to ListenAndServe: (%s)", err)
+		fmt.Printf("failed to ListenAndServe, Err:[%s]", err)
 		os.Exit(1)
 	}
 }
