@@ -1,5 +1,4 @@
 # 静态集群
-
 static是一个分布式文件系统，主要存储小文件。由Golang语言实现，存储是基于mongodb的GridFS。
 
 功能列表：
