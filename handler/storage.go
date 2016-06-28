@@ -2,6 +2,7 @@ package handler
 
 import (
 	"static/misc"
+	"strings"
 
 	log "code.google.com/p/log4go"
 	"gopkg.in/mgo.v2/bson"
@@ -72,45 +73,43 @@ func (s *Storage) DeleteFile(uid, fname string) error {
 	return nil
 }
 
-func (s *Storage) InitUploadUrl(uid, fid string) (interface{}, error) {
+func (s *Storage) InitUploadUrl(fid string) bool {
 	db := misc.Backend.Db.Copy()
 	fs := db.DB("static").GridFS("fs")
 
-	cond := bson.M{"uid": uid, "fid": fid}
-	file, err := fs.Find(cond)
-	if err != nil {
-		log.Warn("failed to get file sign:[%s:%s], Err:[%s]", uid, fid, err)
-		return err
-	}
-
 	var res interface{} = nil
-	err = file.GetMeta(&res)
+	cond := bson.M{"fid": fid}
+	err := fs.Find(cond).One(&res)
 	if err != nil {
-		log.Warn("failed to get meta:[%s:%s], Err:[%s]", uid, fid, err)
-		return nil, err
+		log.Warn("failed to find file:[%s], Err:[%s]", fid, err)
+		return false
 	}
 
-	file.Close()
 	db.Close()
 
-	return res, nil
-
-	return nil
+	return res != nil
 }
 
 func (s *Storage) GetMeta(uid, fid string) (interface{}, error) {
 	db := misc.Backend.Db.Copy()
 	fs := db.DB("static").GridFS("fs")
 
+	res := make(map[string]interface{})
 	fids := strings.Split(fid, ",")
 	cond := bson.M{"uid": uid, "fid": bson.M{"$in": fids}}
-	file, err := fs.Find(cond)
+	filter := bson.M{"_id": 1}
+	err := fs.Find(cond).Select(filter).One(&res)
 	if err != nil {
-		log.Warn("failed to get file:[%s:%s], Err:[%s]", uid, fid, err)
+		log.Warn("failed to find file:[%s:%s], Err:[%s]", uid, fid, err)
 		return nil, err
 	}
 
-	var res interface{} = nil
+	file, err := fs.OpenId(res["_id"])
+	if err != nil {
+		log.Warn("failed to open file:[%s:%s:%s], Err:[%s]", uid, fid, res["_id"], err)
+		return nil, err
+	}
+
 	err = file.GetMeta(&res)
 	if err != nil {
 		log.Warn("failed to get meta:[%s:%s], Err:[%s]", uid, fid, err)

@@ -108,6 +108,13 @@ func staticHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		d, err := s.GetMeta(uid, fid)
+		if err != nil {
+			resp.ErrNo = 10004
+			resp.ErrMsg = "failed to head"
+			b, _ := json.Marshal(resp)
+			fmt.Fprintf(w, "%s", string(b))
+			return
+		}
 		data = d
 	default:
 		http.Error(w, "Method not allowed", 405)
@@ -129,24 +136,14 @@ func initHandler(w http.ResponseWriter, r *http.Request) {
 	var data interface{} = nil
 	switch r.Method {
 	case "POST":
-		uid := r.URL.Query().Get("uid")
 		fsign := r.URL.Query().Get("fsign")
 
-		if uid == "" || fsign == "" {
+		if fsign == "" {
 			http.Error(w, "Bad Request", 400)
 			return
 		}
 
-		err = s.InitUploadUrl(uid, fsign)
-		if err != nil {
-			resp.ErrNo = 10004
-			resp.ErrMsg = "failed to upload"
-			b, _ := json.Marshal(resp)
-			fmt.Fprintf(w, "%s", string(b))
-			return
-		}
-
-		data = "done"
+		data = s.InitUploadUrl(fsign)
 	default:
 		http.Error(w, "Method not allowed", 405)
 		return
